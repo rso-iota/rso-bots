@@ -1,0 +1,55 @@
+syntax = "proto3";
+
+package bot;
+
+// Bot configuration message
+message Bot {
+    string game_id = 1;
+    string difficulty = 2;  // easy, medium, hard
+    optional string strategy = 3;
+}
+
+// Request for bot creation
+message CreateBotRequest {
+    string bot_id = 1;
+    Bot bot = 2;
+}
+
+// Response for bot creation
+message CreateBotResponse {
+    string bot_id = 1;
+    string status = 2;
+}
+
+// Request for bot deletion
+message DeleteBotRequest {
+    string bot_id = 1;
+}
+
+// Empty response for operations that don't return data
+message Empty {}
+
+// Request to get bot information
+message GetBotRequest {
+    string bot_id = 1;
+}
+
+// Response containing list of bots
+message ListBotsResponse {
+    map<string, Bot> bots = 1;
+}
+
+// Bot service definition
+service BotService {
+    // Create a new bot
+    rpc CreateBot(CreateBotRequest) returns (CreateBotResponse) {}
+    
+    // Delete an existing bot
+    rpc DeleteBot(DeleteBotRequest) returns (Empty) {}
+    
+    // Get information about a specific bot
+    rpc GetBot(GetBotRequest) returns (Bot) {}
+    
+    // List all active bots
+    rpc ListBots(Empty) returns (ListBotsResponse) {}
+}

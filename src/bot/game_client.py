@@ -27,7 +27,7 @@ class GameClient:
         self.ws: Optional[websockets.WebSocketClientProtocol] = None
         self.connected = False
         self.player_data = None
-        self.game_state = None
+        self.game_state = {}
         self.game_port = game_port
         self.target_food = None
 
@@ -80,56 +80,27 @@ class GameClient:
                 data = message["data"]
 
                 if msg_type == "gameState":
-                    # Initial game state
-                    self.game_state = data
-                    # Find our player
-                    for player in self.game_state["players"]:
-                        if player["playerName"] == self.player_name:
-                            self.player_data = player
-                            # Check if player is dead in initial state
-                            if not player["alive"]:
-                                logger.info(f"Player {self.player_name} is dead in initial state, rejoining")
-                                await self.send_join_message()
-                            break
+                    # reset game state
+                    self.game_state = {}
+                    self.game_state["food"] = data.get("food", [])
+                    self.game_state["players"] = {p["playerName"]: p for p in data.get("players", [])}
+
 
                 elif msg_type == "update":
                     # Update players
-                    if "players" in data:
-                        # Update existing players and add new ones
-                        for update_player in data["players"]:
-                            player_found = False
-                            for i, player in enumerate(self.game_state["players"]):
-                                if player["playerName"] == update_player["playerName"]:
-                                    was_alive = self.game_state["players"][i]["alive"]
-                                    self.game_state["players"][i] = {
-                                        "playerName": update_player["playerName"],
-                                        "alive": update_player["alive"],
-                                        "circle": update_player["circle"]
-                                    }
-                                    if player["playerName"] == self.player_name:
-                                        self.player_data = self.game_state["players"][i]
-                                        # Check if our player just died
-                                        if was_alive and not update_player["alive"]:
-                                            logger.info(f"Player {self.player_name} died, rejoining")
-                                            await self.send_join_message()
-                                        player_found = True
-                                        break
-                            if not player_found:
-                                self.game_state["players"].append({
-                                    "playerName": update_player["playerName"],
-                                    "alive": update_player["alive"],
-                                    "circle": update_player["circle"]
-                                })
+                    for player in data.get("players", []):
+                        self.game_state["players"][player["playerName"]] = player
 
                     # Update food
-                    if "food" in data:
-                        for update_food in data["food"]:
-                            index = update_food["index"]
-                            self.game_state["food"][index] = update_food
+                    for f in data.get("food", []):
+                        self.game_state["food"][f["index"]] = f
 
                 elif msg_type == "spawn":
-                    # Add new player
-                    self.game_state["players"].append(data)
+                    # Add new player or update existing player
+                    self.game_state["players"][data["playerName"]] = data
+
+                # update player data
+                self.player_data = self.game_state["players"].get(self.player_name, None)
 
         except websockets.exceptions.ConnectionClosed:
             logger.info("Connection closed")

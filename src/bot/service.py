@@ -22,7 +22,7 @@ class BotManager:
         # If bot exists and has a broken connection, clean it up first
         if bot_id in self._bots:
             client = self._game_clients.get(bot_id)
-            if client and (not client.connected or not client.ws or client.ws.closed):
+            if client and (not client.connected or not client.ws):
                 await self.remove_bot(bot_id)
             else:
                 raise ValueError(f"Bot {bot_id} already exists and is still active")
@@ -74,7 +74,7 @@ class BotManager:
         
         if bot_id in self._game_clients:
             client = self._game_clients[bot_id]
-            if client.ws and not client.ws.closed:
+            if client.ws:
                 await client.ws.close()
             del self._game_clients[bot_id]
         

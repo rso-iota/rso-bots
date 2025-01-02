@@ -72,29 +72,53 @@ class GameClient:
         try:
             while True:
                 message = await self.ws.recv()
-                data = json.loads(message)
+                logger.debug(f"Received message: {message}")
+                message = json.loads(message)
+                msg_type = message["type"]
+                data = message["data"]
 
-                if data["type"] == "gameState":
-                    self.game_state = data["data"]
+                if msg_type == "gameState":
+                    # Initial game state
+                    self.game_state = data
                     # Find our player
                     for player in self.game_state["players"]:
                         if player["playerName"] == self.player_name:
                             self.player_data = player
                             break
 
-                elif data["type"] == "update":
-                    if "players" in data["data"]:
-                        for player in data["data"]["players"]:
-                            if player["playerName"] == self.player_name:
-                                self.player_data = player
-                                break
-                    if "food" in data["data"]:
-                        self.game_state["food"] = [
-                            f
-                            for f in self.game_state["food"]
-                            if f["index"]
-                            not in [upd_f["index"] for upd_f in data["data"]["food"]]
-                        ] + data["data"]["food"]
+                elif msg_type == "update":
+                    # Update players
+                    if "players" in data:
+                        # Update existing players and add new ones
+                        for update_player in data["players"]:
+                            player_found = False
+                            for i, player in enumerate(self.game_state["players"]):
+                                if player["playerName"] == update_player["playerName"]:
+                                    self.game_state["players"][i] = {
+                                        "playerName": update_player["playerName"],
+                                        "alive": update_player["alive"],
+                                        "circle": update_player["circle"]
+                                    }
+                                    if player["playerName"] == self.player_name:
+                                        self.player_data = self.game_state["players"][i]
+                                    player_found = True
+                                    break
+                            if not player_found:
+                                self.game_state["players"].append({
+                                    "playerName": update_player["playerName"],
+                                    "alive": update_player["alive"],
+                                    "circle": update_player["circle"]
+                                })
+
+                    # Update food
+                    if "food" in data:
+                        for update_food in data["food"]:
+                            index = update_food["index"]
+                            self.game_state["food"][index] = update_food
+
+                elif msg_type == "spawn":
+                    # Add new player
+                    self.game_state["players"].append(data)
 
         except websockets.exceptions.ConnectionClosed:
             logger.info("Connection closed")

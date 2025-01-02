@@ -3,10 +3,11 @@ import logging
 from concurrent import futures
 from typing import Dict
 import grpc
+import uuid
 
-# Use absolute imports
-import proto.bot_pb2 as bot_pb2
-import proto.bot_pb2_grpc as bot_pb2_grpc
+from .game_client import GameClient
+from ..proto import bot_pb2 as bot_pb2
+from ..proto import bot_pb2_grpc as bot_pb2_grpc
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +17,7 @@ class BotManager:
     """Manages bot lifecycle and connections."""
     def __init__(self):
         self._bots: Dict[str, bot_pb2.Bot] = {}
+        self._game_clients: Dict[str, GameClient] = {}
         self._tasks: Dict[str, asyncio.Task] = {}
     
     async def add_bot(self, bot_id: str, bot: bot_pb2.Bot) -> None:
@@ -24,9 +26,18 @@ class BotManager:
             raise ValueError(f"Bot {bot_id} already exists")
         
         self._bots[bot_id] = bot
+        
+        # Create game client for this bot
+        client = GameClient(
+            game_id=bot.game_id,
+            player_name=f"Bot-{bot_id[:6]}",  # Use first 6 chars of bot ID as name
+            strategy=bot.strategy if bot.strategy else "greedy"
+        )
+        self._game_clients[bot_id] = client
+        
         # Create an asyncio task for the bot
         loop = asyncio.get_event_loop()
-        self._tasks[bot_id] = loop.create_task(self._run_bot(bot_id, bot))
+        self._tasks[bot_id] = loop.create_task(client.run())
         logger.info(f"Added bot {bot_id} to game {bot.game_id}")
 
     async def remove_bot(self, bot_id: str) -> None:
@@ -43,21 +54,15 @@ class BotManager:
                 pass
             del self._tasks[bot_id]
         
+        # Clean up game client
+        if bot_id in self._game_clients:
+            client = self._game_clients[bot_id]
+            if client.ws:
+                await client.ws.close()
+            del self._game_clients[bot_id]
+        
         del self._bots[bot_id]
         logger.info(f"Removed bot {bot_id}")
-
-    async def _run_bot(self, bot_id: str, bot: bot_pb2.Bot) -> None:
-        """Run the bot's game loop."""
-        try:
-            while True:
-                # Here you would implement the actual bot behavior
-                await asyncio.sleep(1)  # Placeholder for actual game logic
-        except asyncio.CancelledError:
-            logger.info(f"Bot {bot_id} task cancelled")
-            raise
-        except Exception as e:
-            logger.error(f"Error in bot {bot_id}: {e}")
-            raise
 
 class BotServiceServicer(bot_pb2_grpc.BotServiceServicer):
     """gRPC service implementation for bot management."""

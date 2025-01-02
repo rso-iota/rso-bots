@@ -36,7 +36,8 @@ class GameClient:
         try:
             logger.info(f"Connecting to game {self.game_id}")
             self.ws = await websockets.connect(
-                f"ws://localhost:{self.game_port}/connect/{self.game_id}"
+                f"ws://localhost:{self.game_port}/connect/{self.game_id}",
+                ping_interval=None,
             )
             self.connected = True
             logger.info(f"Connected to game {self.game_id}")
@@ -46,6 +47,9 @@ class GameClient:
             await self.send_message(join_msg)
 
             return True
+        except asyncio.TimeoutError:
+            logger.error("Connection to game timed out")
+            return False
         except Exception as e:
             logger.error(f"Failed to connect to game: {e}")
             return False

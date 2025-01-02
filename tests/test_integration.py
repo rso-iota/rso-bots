@@ -3,8 +3,9 @@ import grpc
 import asyncio
 from concurrent import futures
 
-from proto import bot_pb2, bot_pb2_grpc
-from bot.service import BotServiceServicer
+# Use absolute imports since src is in PYTHONPATH
+from src.proto import bot_pb2, bot_pb2_grpc
+from src.bot.service import BotServiceServicer
 
 @pytest.fixture(scope="module")
 def grpc_server():

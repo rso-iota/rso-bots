@@ -22,14 +22,19 @@ class BotManager:
         if bot_id in self._bots:
             raise ValueError(f"Bot {bot_id} already exists")
         
-        self._bots[bot_id] = bot
         client = GameClient(
             game_id=bot.game_id,
             player_name=f"Bot-{bot_id[:6]}",
             strategy=bot.strategy if bot.strategy else "greedy"
         )
-        self._game_clients[bot_id] = client
         
+        # Try to connect first
+        if not await client.connect():
+            raise ConnectionError(f"Failed to connect bot {bot_id} to game {bot.game_id}")
+            
+        # Only add the bot if connection was successful
+        self._bots[bot_id] = bot
+        self._game_clients[bot_id] = client
         self._tasks[bot_id] = asyncio.create_task(client.run())
         logger.info(f"Added bot {bot_id} to game {bot.game_id}")
 
@@ -72,6 +77,10 @@ class BotServiceServicer(bot_pb2_grpc.BotServiceServicer):
             )
         except ValueError as e:
             context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+            context.set_details(str(e))
+            return bot_pb2.CreateBotResponse()
+        except ConnectionError as e:
+            context.set_code(grpc.StatusCode.UNAVAILABLE)
             context.set_details(str(e))
             return bot_pb2.CreateBotResponse()
         except Exception as e:

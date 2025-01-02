@@ -19,11 +19,10 @@ class BotManager:
         self._tasks: Dict[str, asyncio.Task] = {}
     
     async def add_bot(self, bot_id: str, bot: bot_pb2.Bot) -> None:
-        # If bot exists but is dead, clean it up first
+        # If bot exists and has a broken connection, clean it up first
         if bot_id in self._bots:
             client = self._game_clients.get(bot_id)
-            if client and (not client.connected or 
-                         (client.player_data and not client.player_data.get("alive", False))):
+            if client and (not client.connected or not client.ws or client.ws.closed):
                 await self.remove_bot(bot_id)
             else:
                 raise ValueError(f"Bot {bot_id} already exists and is still active")
@@ -42,12 +41,12 @@ class BotManager:
         self._bots[bot_id] = bot
         self._game_clients[bot_id] = client
         
-        # Create a wrapper task that monitors the bot's death
+        # Create a wrapper task that monitors the bot's connection
         self._tasks[bot_id] = asyncio.create_task(self._run_bot(bot_id, client))
         logger.info(f"Added bot {bot_id} to game {bot.game_id}")
 
     async def _run_bot(self, bot_id: str, client: GameClient):
-        """Run the bot and automatically clean up when it dies"""
+        """Run the bot and automatically clean up when connection drops"""
         try:
             await client.run()
         except asyncio.CancelledError:
@@ -55,8 +54,10 @@ class BotManager:
         except Exception as e:
             logger.error(f"Bot {bot_id} encountered an error: {e}")
         finally:
+            # If we get here, it means the connection dropped or there was an error
             # Clean up the bot if it's not already removed
             if bot_id in self._bots:
+                logger.info(f"Bot {bot_id} connection lost, cleaning up")
                 await self.remove_bot(bot_id)
 
     async def remove_bot(self, bot_id: str) -> None:
@@ -73,7 +74,7 @@ class BotManager:
         
         if bot_id in self._game_clients:
             client = self._game_clients[bot_id]
-            if client.ws:
+            if client.ws and not client.ws.closed:
                 await client.ws.close()
             del self._game_clients[bot_id]
         

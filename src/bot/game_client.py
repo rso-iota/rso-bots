@@ -20,7 +20,6 @@ class GameClient:
         player_name: str,
         strategy: str = "random",
         game_port: int = 8080,
-        bot_id = None  # Add bot_id parameter for identification
     ):
         self.game_id = game_id
         self.player_name = player_name
@@ -31,8 +30,6 @@ class GameClient:
         self.game_state = None
         self.game_port = game_port
         self.target_food = None
-        self.bot_id = bot_id  # Store the bot_id for manager reference
-        self._death_event = asyncio.Event()  # Add event for signaling death
 
     async def connect(self):
         """Connect to the game server."""
@@ -45,10 +42,7 @@ class GameClient:
             self.connected = True
             logger.info(f"Connected to game {self.game_id}")
 
-            # Send join message
-            join_msg = {"type": "join", "data": {"playerName": self.player_name}}
-            await self.send_message(join_msg)
-
+            await self.send_join_message()
             return True
         except asyncio.TimeoutError:
             logger.error("Connection to game timed out")
@@ -56,6 +50,11 @@ class GameClient:
         except Exception as e:
             logger.error(f"Failed to connect to game: {e}")
             return False
+
+    async def send_join_message(self):
+        """Send a join message to the game server."""
+        join_msg = {"type": "join", "data": {"playerName": self.player_name}}
+        await self.send_message(join_msg)
 
     async def send_message(self, message: dict):
         """Send a message to the game server."""
@@ -89,8 +88,8 @@ class GameClient:
                             self.player_data = player
                             # Check if player is dead in initial state
                             if not player["alive"]:
-                                logger.info(f"Player {self.player_name} is dead in initial state")
-                                await self._handle_death()
+                                logger.info(f"Player {self.player_name} is dead in initial state, rejoining")
+                                await self.send_join_message()
                             break
 
                 elif msg_type == "update":
@@ -111,10 +110,10 @@ class GameClient:
                                         self.player_data = self.game_state["players"][i]
                                         # Check if our player just died
                                         if was_alive and not update_player["alive"]:
-                                            logger.info(f"Player {self.player_name} has died")
-                                            await self._handle_death()
-                                    player_found = True
-                                    break
+                                            logger.info(f"Player {self.player_name} died, rejoining")
+                                            await self.send_join_message()
+                                        player_found = True
+                                        break
                             if not player_found:
                                 self.game_state["players"].append({
                                     "playerName": update_player["playerName"],
@@ -138,17 +137,6 @@ class GameClient:
         except Exception as e:
             logger.error(f"Error handling messages: {e}")
             self.connected = False
-
-    async def _handle_death(self):
-        """Handle the death event of the bot"""
-        self.connected = False
-        self._death_event.set()
-        if self.ws:
-            await self.ws.close()
-
-    async def wait_for_death(self):
-        """Wait for the death event to be triggered"""
-        await self._death_event.wait()
 
     def calculate_move(self) -> tuple[float, float]:
         """Calculate the next move based on the current game state."""
@@ -209,8 +197,7 @@ class GameClient:
             # Run message handler and game loop concurrently
             await asyncio.gather(
                 self.handle_messages(),
-                self.game_loop(),
-                self.wait_for_death()
+                self.game_loop()
             )
         finally:
             if self.ws:

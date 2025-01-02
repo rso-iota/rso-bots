@@ -19,8 +19,14 @@ class BotManager:
         self._tasks: Dict[str, asyncio.Task] = {}
     
     async def add_bot(self, bot_id: str, bot: bot_pb2.Bot) -> None:
+        # If bot exists but is dead, clean it up first
         if bot_id in self._bots:
-            raise ValueError(f"Bot {bot_id} already exists")
+            client = self._game_clients.get(bot_id)
+            if client and (not client.connected or 
+                         (client.player_data and not client.player_data.get("alive", False))):
+                await self.remove_bot(bot_id)
+            else:
+                raise ValueError(f"Bot {bot_id} already exists and is still active")
         
         client = GameClient(
             game_id=bot.game_id,
@@ -35,8 +41,23 @@ class BotManager:
         # Only add the bot if connection was successful
         self._bots[bot_id] = bot
         self._game_clients[bot_id] = client
-        self._tasks[bot_id] = asyncio.create_task(client.run())
+        
+        # Create a wrapper task that monitors the bot's death
+        self._tasks[bot_id] = asyncio.create_task(self._run_bot(bot_id, client))
         logger.info(f"Added bot {bot_id} to game {bot.game_id}")
+
+    async def _run_bot(self, bot_id: str, client: GameClient):
+        """Run the bot and automatically clean up when it dies"""
+        try:
+            await client.run()
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error(f"Bot {bot_id} encountered an error: {e}")
+        finally:
+            # Clean up the bot if it's not already removed
+            if bot_id in self._bots:
+                await self.remove_bot(bot_id)
 
     async def remove_bot(self, bot_id: str) -> None:
         if bot_id not in self._bots:
@@ -56,7 +77,9 @@ class BotManager:
                 await client.ws.close()
             del self._game_clients[bot_id]
         
-        del self._bots[bot_id]
+        if bot_id in self._bots:
+            del self._bots[bot_id]
+            
         logger.info(f"Removed bot {bot_id}")
 
 class BotServiceServicer(bot_pb2_grpc.BotServiceServicer):
@@ -76,7 +99,10 @@ class BotServiceServicer(bot_pb2_grpc.BotServiceServicer):
                 status="created"
             )
         except ValueError as e:
-            context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+            if "still active" in str(e):
+                context.set_code(grpc.StatusCode.ALREADY_EXISTS)
+            else:
+                context.set_code(grpc.StatusCode.INVALID_ARGUMENT)
             context.set_details(str(e))
             return bot_pb2.CreateBotResponse()
         except ConnectionError as e:

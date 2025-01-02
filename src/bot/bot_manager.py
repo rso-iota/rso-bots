@@ -9,55 +9,53 @@ from .strategy import BotStrategy
 logger = logging.getLogger(__name__)
 
 class BotInstance:
-    def __init__(self, client: GameClient, strategy: BotStrategy, name: str):
+    def __init__(self, game_id: str, name: str, strategy: str = "random", game_port: int = 8080):
         self.id = uuid4()
-        self.client = client
-        self.strategy = strategy
         self.name = name
+        self.game_id = game_id
+        self.strategy = strategy
+        self.game_port = game_port
+        self.client = None
         self.task: Optional[asyncio.Task] = None
         
-    async def start(self, game_id: str):
+    async def start(self):
         """Start the bot instance"""
-        await self.client.connect(game_id, self.name)
-        # Create two tasks: one for receiving messages, one for bot logic
-        self.message_task = asyncio.create_task(self.client.handle_messages())
-        self.strategy_task = asyncio.create_task(self.run_strategy())
+        self.client = GameClient(
+            game_id=self.game_id,
+            player_name=self.name,
+            strategy=self.strategy,
+            game_port=self.game_port,
+            bot_id=self.id
+        )
+        self.task = asyncio.create_task(self._run())
         
     async def stop(self):
         """Stop the bot instance"""
-        if self.message_task:
-            self.message_task.cancel()
-        if self.strategy_task:
-            self.strategy_task.cancel()
-        if self.client.websocket:
-            await self.client.websocket.close()
-            
-    async def run_strategy(self):
-        """Run the bot's strategy loop"""
+        if self.task:
+            self.task.cancel()
+            try:
+                await self.task
+            except asyncio.CancelledError:
+                pass
+
+    async def _run(self):
+        """Run the bot and handle its lifecycle"""
         try:
-            while True:
-                if self.client.game_state:
-                    dx, dy = self.strategy.calculate_move(
-                        self.client.game_state, 
-                        self.name
-                    )
-                    await self.client.move(dx, dy)
-                await asyncio.sleep(0.1)
+            await self.client.run()
         except Exception as e:
-            logger.error(f"Error in bot {self.name} strategy: {e}")
+            logger.error(f"Bot {self.name} encountered an error: {e}")
+        finally:
+            # If we get here, either the bot died or encountered an error
+            logger.info(f"Bot {self.name} finished running")
 
 class BotManager:
-    def __init__(self, server_url: str):
-        self.server_url = server_url
+    def __init__(self):
         self.bots: Dict[UUID, BotInstance] = {}
         
-    async def create_bot(self, name: str, game_id: str, strategy_type: str = "basic") -> UUID:
+    async def create_bot(self, name: str, game_id: str, strategy: str = "random", game_port: int = 8080) -> UUID:
         """Create and start a new bot"""
-        client = GameClient(self.server_url)
-        strategy = BotStrategy()  # You could have different strategy types
-        
-        bot = BotInstance(client, strategy, name)
-        await bot.start(game_id)
+        bot = BotInstance(game_id, name, strategy, game_port)
+        await bot.start()
         
         self.bots[bot.id] = bot
         return bot.id
@@ -81,7 +79,8 @@ class BotManager:
         return {
             "id": bot.id,
             "name": bot.name,
-            "game_state": bot.client.game_state
+            "game_id": bot.game_id,
+            "alive": bot.client and bot.client.player_data and bot.client.player_data.get("alive", False)
         }
         
     def get_all_bots(self) -> list[dict]:
@@ -90,7 +89,8 @@ class BotManager:
             {
                 "id": bot.id,
                 "name": bot.name,
-                "alive": bot.client.game_state is not None
+                "game_id": bot.game_id,
+                "alive": bot.client and bot.client.player_data and bot.client.player_data.get("alive", False)
             }
             for bot in self.bots.values()
         ]

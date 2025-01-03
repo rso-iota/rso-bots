@@ -5,6 +5,6 @@ WORKDIR /app
 COPY pyproject.toml .
 RUN pip install --no-cache-dir .
 
-COPY src/ .
+COPY src/ src/
 
-CMD ["python", "main.py"]
+CMD ["python", "-m", "src.main"]

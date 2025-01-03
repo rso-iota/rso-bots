@@ -33,16 +33,16 @@ class BotManager:
             strategy=bot.strategy if bot.strategy else "greedy"
         )
         
-        # Try to connect first
-        if not await client.connect():
-            raise ConnectionError(f"Failed to connect bot {bot_id} to game {bot.game_id}")
+        # # Try to connect first
+        # if not await client.connect():
+        #     raise ConnectionError(f"Failed to connect bot {bot_id} to game {bot.game_id}")
             
-        # Only add the bot if connection was successful
-        self._bots[bot_id] = bot
-        self._game_clients[bot_id] = client
         
         # Create a wrapper task that monitors the bot's connection
         self._tasks[bot_id] = asyncio.create_task(self._run_bot(bot_id, client))
+        # Only add the bot if connection was successful
+        self._bots[bot_id] = bot
+        self._game_clients[bot_id] = client
         logger.info(f"Added bot {bot_id} to game {bot.game_id}")
 
     async def _run_bot(self, bot_id: str, client: GameClient):

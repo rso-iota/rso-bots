@@ -30,6 +30,7 @@ class GameClient:
         self.game_state = {}
         self.game_port = game_port
         self.target_food = None
+        self.running = False
 
     async def connect(self):
         """Connect to the game server."""
@@ -101,6 +102,10 @@ class GameClient:
 
                 # update player data
                 self.player_data = self.game_state["players"].get(self.player_name, None)
+                # handle death
+                if self.player_data and not self.player_data["alive"]:
+                    # rejoin game
+                    await self.send_join_message()
 
         except websockets.exceptions.ConnectionClosed:
             logger.info("Connection closed")
@@ -161,11 +166,14 @@ class GameClient:
 
     async def run(self):
         """Run the game client."""
+        if self.running:
+            raise Exception("Client is already running")
         if not await self.connect():
-            return
+            raise ConnectionError(f"Failed to connect bot to game {self.game_id}")
 
         try:
             # Run message handler and game loop concurrently
+            self.running = True
             await asyncio.gather(
                 self.handle_messages(),
                 self.game_loop()

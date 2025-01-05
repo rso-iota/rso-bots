@@ -29,7 +29,7 @@ class BotManager:
         
         client = GameClient(
             game_id=bot.game_id,
-            player_name=f"Bot-{bot_id[:6]}",
+            player_name=f"Bot-{bot_id}",
             strategy=bot.strategy if bot.strategy else "greedy"
         )
         

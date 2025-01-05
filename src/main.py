@@ -18,9 +18,9 @@ def run_grpc_server(loop):
     servicer = BotServiceServicer()
     servicer.loop = loop
     bot_pb2_grpc.add_BotServiceServicer_to_server(servicer, server)
-    server.add_insecure_port('[::]:50051')
+    server.add_insecure_port(f'[::]:{settings.grpc_port}')
     server.start()
-    logger.info("Bot service started on port 50051")
+    logger.info(f"Bot service started on port {settings.grpc_port}")
     server.wait_for_termination()
 
 def serve():

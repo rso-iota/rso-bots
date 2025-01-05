@@ -8,4 +8,6 @@ class Settings(BaseSettings):
     # Logging settings
     log_level: str = Field("INFO", description="Logging level")
     
+    grpc_port: int = Field(50051, description="gRPC server port")
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")

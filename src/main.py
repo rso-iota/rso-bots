@@ -6,8 +6,11 @@ import threading
 
 from .bot.service import BotServiceServicer
 from .proto import bot_pb2_grpc
+from src.config.settings import Settings
 
-logging.basicConfig(level=logging.INFO)
+settings = Settings()
+
+logging.basicConfig(level=settings.log_level)
 logger = logging.getLogger(__name__)
 
 def run_grpc_server(loop):

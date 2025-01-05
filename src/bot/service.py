@@ -8,17 +8,21 @@ import uuid
 from src.bot.game_client import GameClient
 from src.proto import bot_pb2
 from src.proto import bot_pb2_grpc
+from src.config.settings import Settings
+
+settings = Settings()
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class BotManager:
-    def __init__(self):
+    def __init__(self, settings):
         self._bots: Dict[str, bot_pb2.Bot] = {}
         self._game_clients: Dict[str, GameClient] = {}
         self._tasks: Dict[str, asyncio.Task] = {}
+        self._settings = settings
     
-    async def add_bot(self, bot_id: str, bot: bot_pb2.Bot) -> None:
+    async def add_bot(self, bot_id: str, bot: bot_pb2.Bot, access_token: str, host_name: str="localhost") -> None:
         # If bot exists and has a broken connection, clean it up first
         if bot_id in self._bots:
             client = self._game_clients.get(bot_id)
@@ -30,7 +34,10 @@ class BotManager:
         client = GameClient(
             game_id=bot.game_id,
             player_name=f"Bot-{bot_id}",
-            strategy=bot.strategy if bot.strategy else "greedy"
+            strategy=bot.strategy if bot.strategy else "greedy",
+            host_name=host_name, # TODO get from protobuf
+            game_port=self.settings.game_port or "8080",
+            access_token=access_token
         )
         
         # # Try to connect first
@@ -85,13 +92,13 @@ class BotManager:
 
 class BotServiceServicer(bot_pb2_grpc.BotServiceServicer):
     def __init__(self):
-        self.bot_manager = BotManager()
+        self.bot_manager = BotManager(settings)
         self.loop = None
 
     def CreateBot(self, request, context):
         try:
             future = asyncio.run_coroutine_threadsafe(
-                self.bot_manager.add_bot(request.bot_id, request.bot),
+                self.bot_manager.add_bot(request.bot_id, request.bot, request.access_token, request.host_name),
                 self.loop
             )
             future.result(timeout=10)  # 10 second timeout

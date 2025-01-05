@@ -19,7 +19,9 @@ class GameClient:
         game_id: str,
         player_name: str,
         strategy: str = "random",
+        host_name: str = "localhost",
         game_port: int = 8080,
+        access_token: str = None,
     ):
         self.game_id = game_id
         self.player_name = player_name
@@ -28,16 +30,18 @@ class GameClient:
         self.connected = False
         self.player_data = None
         self.game_state = {}
+        self.host_name = host_name
         self.game_port = game_port
         self.target_food = None
         self.running = False
+        self.access_token = access_token
 
     async def connect(self):
         """Connect to the game server."""
         try:
             logger.info(f"Connecting to game {self.game_id}")
             self.ws = await websockets.connect(
-                f"ws://localhost:{self.game_port}/connect/{self.game_id}",
+                f"ws://{self.host_name}:{self.game_port}/connect/{self.game_id}?token={self.access_token}",
                 ping_interval=None,
             )
             self.connected = True

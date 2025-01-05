@@ -33,7 +33,7 @@ class BotManager:
         
         client = GameClient(
             game_id=bot.game_id,
-            player_name=f"Bot-{bot_id}",
+            player_name=bot_id,
             strategy=bot.strategy if bot.strategy else "greedy",
             host_name=host_name, # TODO get from protobuf
             game_port=self.settings.game_port or "8080",

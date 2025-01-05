@@ -29,7 +29,10 @@ class GameClient:
         self.ws: Optional[websockets.WebSocketClientProtocol] = None
         self.connected = False
         self.player_data = None
-        self.game_state = {}
+        self.game_state = {
+            "food": [],
+            "players": {},
+        }
         self.host_name = host_name
         self.game_port = game_port
         self.target_food = None

@@ -20,7 +20,7 @@ class BotManager:
         self._bots: Dict[str, bot_pb2.Bot] = {}
         self._game_clients: Dict[str, GameClient] = {}
         self._tasks: Dict[str, asyncio.Task] = {}
-        self._settings = settings
+        self.settings = settings
     
     async def add_bot(self, bot_id: str, bot: bot_pb2.Bot, access_token: str, host_name: str="localhost") -> None:
         # If bot exists and has a broken connection, clean it up first
@@ -98,7 +98,7 @@ class BotServiceServicer(bot_pb2_grpc.BotServiceServicer):
     def CreateBot(self, request, context):
         try:
             future = asyncio.run_coroutine_threadsafe(
-                self.bot_manager.add_bot(request.bot_id, request.bot, request.access_token, request.host_name),
+                self.bot_manager.add_bot(request.bot_id, request.bot, request.access_token, request.hostname),
                 self.loop
             )
             future.result(timeout=10)  # 10 second timeout

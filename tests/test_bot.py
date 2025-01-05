@@ -3,9 +3,6 @@ from unittest.mock import MagicMock, AsyncMock, patch
 from src.bot.strategy import BotStrategy
 from src.bot.game_client import GameClient
 from src.bot.bot_manager import BotManager, BotInstance
-from src.config.settings import Settings
-
-settings = Settings()
 
 @pytest.fixture
 def game_state():
@@ -49,7 +46,7 @@ def test_strategy_calculates_move(strategy, game_state):
 
 @pytest.mark.asyncio
 async def test_bot_manager_creates_bot():
-    manager = BotManager(settings)
+    manager = BotManager()
     
     # Mock the client and strategy
     with patch("src.bot.bot_manager.GameClient") as mock_client, \
@@ -67,10 +64,12 @@ async def test_bot_manager_creates_bot():
         assert bot_id in manager.bots
         assert manager.bots[bot_id].name == "TestBot"
         
+        # Verify client was connected
+        mock_client_instance.connect.assert_called_once_with("game1", "TestBot")
 
 @pytest.mark.asyncio
 async def test_bot_manager_removes_bot():
-    manager = BotManager(settings)
+    manager = BotManager()
     
     # Mock the client and strategy
     with patch("src.bot.bot_manager.GameClient") as mock_client:

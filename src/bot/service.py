@@ -12,7 +12,8 @@ from src.config.settings import Settings
 
 settings = Settings()
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=settings.log_level, format='{"time": "%(asctime)s", "level": "%(levelname)s", "message": "%(message)s"}')
+
 logger = logging.getLogger(__name__)
 
 class BotManager:
@@ -23,10 +24,12 @@ class BotManager:
         self.settings = settings
     
     async def add_bot(self, bot_id: str, bot: bot_pb2.Bot, access_token: str, host_name: str="localhost") -> None:
+        logger.info(f"Adding bot {bot_id} to game {bot.game_id}")
         # If bot exists and has a broken connection, clean it up first
         if bot_id in self._bots:
             client = self._game_clients.get(bot_id)
             if client and (not client.connected or not client.ws):
+                logger.info(f"Bot {bot_id} already exists but connection is broken, cleaning up")
                 await self.remove_bot(bot_id)
             else:
                 raise ValueError(f"Bot {bot_id} already exists and is still active")
@@ -68,6 +71,7 @@ class BotManager:
                 await self.remove_bot(bot_id)
 
     async def remove_bot(self, bot_id: str) -> None:
+        logger.info(f"Removing bot {bot_id}")
         if bot_id not in self._bots:
             raise ValueError(f"Bot {bot_id} does not exist")
         

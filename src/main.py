@@ -10,7 +10,8 @@ from src.config.settings import Settings
 
 settings = Settings()
 
-logging.basicConfig(level=settings.log_level)
+logging.basicConfig(level=settings.log_level, format='{"time": "%(asctime)s", "level": "%(levelname)s", "message": "%(message)s"}')
+
 logger = logging.getLogger(__name__)
 
 def run_grpc_server(loop):

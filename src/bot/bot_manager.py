@@ -34,6 +34,7 @@ class BotInstance:
         
     async def stop(self):
         """Stop the bot instance"""
+        logger.info(f"Stopping bot {self.name}")
         if self.task:
             self.task.cancel()
             try:
@@ -43,6 +44,7 @@ class BotInstance:
 
     async def _run(self):
         """Run the bot and handle its lifecycle"""
+        logger.info(f"Bot {self.name} starting")
         try:
             await self.client.run()
         except Exception as e:
@@ -58,6 +60,7 @@ class BotManager:
         
     async def create_bot(self, name: str, game_id: str, strategy: str = "random", host_name='localhost', game_port: int = 8080) -> UUID:
         """Create and start a new bot"""
+        logger.info(f"Creating bot {name} for game {game_id}")
         bot = BotInstance(game_id, name, strategy, host_name, game_port)
         await bot.start()
         

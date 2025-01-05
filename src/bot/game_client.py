@@ -5,9 +5,13 @@ import websockets
 from typing import Optional
 import math
 import random
+from src.config.settings import Settings
+
+settings = Settings()
 
 # Configure logging
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=settings.log_level, format='{"time": "%(asctime)s", "level": "%(levelname)s", "message": "%(message)s"}')
+
 logger = logging.getLogger(__name__)
 
 
@@ -38,6 +42,7 @@ class GameClient:
         self.target_food = None
         self.running = False
         self.access_token = access_token
+        logger.info(f"Created game client for game {game_id}")
 
     async def connect(self):
         """Connect to the game server."""
@@ -61,6 +66,7 @@ class GameClient:
 
     async def send_join_message(self):
         """Send a join message to the game server."""
+        logger.info(f"Sending join message as {self.player_name}")
         join_msg = {"type": "join", "data": {"playerName": self.player_name}}
         await self.send_message(join_msg)
 
@@ -82,10 +88,10 @@ class GameClient:
         try:
             while True:
                 message = await self.ws.recv()
-                logger.debug(f"Received message: {message}")
                 message = json.loads(message)
                 msg_type = message["type"]
                 data = message["data"]
+                logger.debug(f"Received message: {message} of type {msg_type}")
 
                 if msg_type == "gameState":
                     # reset game state

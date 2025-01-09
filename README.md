@@ -10,6 +10,7 @@ A service that manages multiple game bots for the RSO game system. Each bot is a
 - WebSocket communication with game server
 - Automatic reconnection handling
 - Environment-based configuration
+- Health checks (liveness and readiness probes)
 
 ## Installation
 
@@ -58,7 +59,7 @@ docker build -t rso-bots .
 
 Run:
 ```bash
-docker run -p 50051:50051 --env-file .env rso-bots
+docker run -p 50051:50051 -p 8080:8080 --env-file .env rso-bots
 ```
 
 ## API Reference
@@ -127,6 +128,20 @@ message ListBotsResponse {
 }
 ```
 
+### Health Checks
+
+The service also exposes HTTP health check endpoints:
+
+```http
+GET /health/live
+```
+Liveness probe - returns service status.
+
+```http
+GET /health/ready
+```
+Readiness probe - verifies service is accepting requests.
+
 ## Errors
 
 The API uses standard gRPC status codes:
@@ -145,6 +160,7 @@ Core components:
 - BotManager: Manages bot lifecycle and state
 - GameClient: Handles WebSocket communication with game server
 - BotStrategy: Implements bot behavior and decision making
+- Health checks: Monitor service health via HTTP endpoints
 
 Each bot runs independently with:
 - Message handling for WebSocket communication
